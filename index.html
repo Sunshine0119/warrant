@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台灣權證篩選器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e17;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: #1e2d4a;
+    --accent: #00e5a0;
+    --accent-dim: #00e5a022;
+    --accent-glow: #00e5a044;
+    --red: #ff4d6a;
+    --yellow: #fbbf24;
+    --text: #e2e8f0;
+    --text-dim: #64748b;
+    --text-muted: #475569;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans TC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Animated BG ── */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(ellipse at 30% 20%, #00e5a008 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, #3b82f608 0%, transparent 50%);
+    animation: drift 20s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+  }
+  @keyframes drift {
+    0% { transform: translate(0, 0) rotate(0deg); }
+    100% { transform: translate(-3%, 3%) rotate(2deg); }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #00e5a0, #3b82f6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    box-shadow: 0 0 24px #00e5a033;
+  }
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #e2e8f0, #94a3b8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header p {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  /* ── Controls ── */
+  .controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .control-group label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.5rem;
+  }
+  .control-group input,
+  .control-group select {
+    width: 100%;
+    padding: 0.7rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.95rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  .control-group input:focus,
+  .control-group select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+  .control-group select { cursor: pointer; }
+  .control-group select option { background: var(--surface); }
+
+  .btn-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+  .btn {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0e17;
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0 32px var(--accent-glow);
+  }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--text-dim); }
+
+  /* ── Progress ── */
+  .progress-wrap {
+    margin-bottom: 1.5rem;
+    display: none;
+  }
+  .progress-wrap.active { display: block; }
+  .progress-text {
+    font-size: 0.85rem;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .progress-text .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--accent-dim);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .progress-bar {
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  /* ── Metrics ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    text-align: center;
+    transition: border-color 0.3s;
+  }
+  .metric-card:hover { border-color: var(--accent); }
+  .metric-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .metric-label {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-top: 0.3rem;
+  }
+
+  /* ── Search box ── */
+  .search-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.6rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-muted); }
+  .result-count {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── Table ── */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface2);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.85rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color 0.2s;
+  }
+  thead th:hover { color: var(--accent); }
+  thead th .sort-icon { margin-left: 4px; font-size: 0.7rem; }
+  tbody tr {
+    border-bottom: 1px solid #1a2236;
+    transition: background 0.15s;
+  }
+  tbody tr:hover { background: #ffffff06; }
+  tbody td {
+    padding: 0.7rem 1rem;
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.84rem;
+  }
+  tbody td:nth-child(2) {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 500;
+  }
+  .tag-call {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: #ff4d6a1a;
+    color: var(--red);
+  }
+  .tag-put {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    background: #3b82f61a;
+    color: #60a5fa;
+  }
+
+  /* ── Empty / Error ── */
+  .msg-box {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-dim);
+  }
+  .msg-box .icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+  .msg-box .title { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 0.3rem; }
+  .msg-box.error .title { color: var(--red); }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 2rem 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .container { padding: 1rem; }
+    .header h1 { font-size: 1.2rem; }
+    .controls { grid-template-columns: 1fr 1fr; }
+    .metric-value { font-size: 1.3rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">🎯</div>
+    <div>
+      <h1>台灣權證篩選器</h1>
+      <p>即時從證交所抓取行情 · 篩選低價 + 長天期權證</p>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="control-group">
+      <label>收盤價上限（元）</label>
+      <input type="number" id="maxPrice" value="0.5" min="0.01" step="0.1">
+    </div>
+    <div class="control-group">
+      <label>到期至少幾個月後</label>
+      <input type="number" id="minMonths" value="6" min="1" max="36" step="1">
+    </div>
+    <div class="control-group">
+      <label>權證類型</label>
+      <select id="warrantType">
+        <option value="all">全部</option>
+        <option value="call">認購 (Call)</option>
+        <option value="put">認售 (Put)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btnScreen" onclick="startScreening()">
+      🔍 開始篩選
+    </button>
+    <button class="btn btn-secondary" id="btnCsv" onclick="downloadCSV()" style="display:none;">
+      💾 下載 CSV
+    </button>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-text">
+      <div class="spinner"></div>
+      <span id="progressText">準備中...</span>
+    </div>
+    <div class="progress-bar"><div class="progress-bar-fill" id="progressFill"></div></div>
+  </div>
+
+  <!-- Metrics -->
+  <div class="metrics" id="metrics" style="display:none;">
+    <div class="metric-card">
+      <div class="metric-value" id="mTotal">-</div>
+      <div class="metric-label">全部權證</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="mMatch">-</div>
+      <div class="metric-label">符合條件</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="mAvgPrice">-</div>
+      <div class="metric-label">平均收盤價</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-value" id="mAvgDays">-</div>
+      <div class="metric-label">平均距到期天數</div>
+    </div>
+  </div>
+
+  <!-- Search + Table -->
+  <div id="resultSection" style="display:none;">
+    <div class="search-row">
+      <input class="search-input" id="searchInput" placeholder="搜尋標的名稱（如：台積電、鴻海）" oninput="filterTable()">
+      <span class="result-count" id="resultCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Messages -->
+  <div class="msg-box" id="msgBox">
+    <div class="icon">📊</div>
+    <div class="title">設定好條件後按「開始篩選」</div>
+    <div>資料由您的瀏覽器直接向證交所 API 請求，需在台灣網路環境下使用</div>
+  </div>
+
+  <div class="footer">
+    資料來源：臺灣證券交易所公開 API · 僅供參考，不構成投資建議
+  </div>
+</div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━ State ━━━━━━━━━━━━━━━━━
+let allResults = [];
+let sortCol = null;
+let sortAsc = true;
+
+// ━━━━━━━━━━━━━━━━━ Utility ━━━━━━━━━━━━━━━━━
+function parsePrice(v) {
+  if (v == null) return null;
+  const s = String(v).trim().replace(/,/g, '');
+  if (['', '-', '--', 'N/A', '0', '0.00', 'X'].includes(s)) return null;
+  const f = parseFloat(s);
+  return (!isNaN(f) && f > 0) ? f : null;
+}
+
+function extractExpiryFromName(name) {
+  if (!name) return null;
+  const m = name.trim().match(/(\d{2,3})(購|售)(\d+)\s*$/);
+  if (!m) return null;
+  const num = m[1];
+  let yd, mo;
+  if (num.length === 2) { yd = +num[0]; mo = +num[1]; }
+  else if (num.length === 3) { yd = +num[0]; mo = +num.slice(1); }
+  else return null;
+  if (mo < 1 || mo > 12) return null;
+
+  const curRoc = new Date().getFullYear() - 1911;
+  const dec = Math.floor(curRoc / 10);
+  const candidates = [(dec-1)*10+yd, dec*10+yd, (dec+1)*10+yd];
+  let best = candidates.reduce((a, b) => {
+    const ya = a + 1911, yb = b + 1911;
+    const da = (ya >= 2020 && ya <= 2040) ? Math.abs(a - curRoc) : 9999;
+    const db = (yb >= 2020 && yb <= 2040) ? Math.abs(b - curRoc) : 9999;
+    return da <= db ? a : b;
+  });
+  const y = best + 1911;
+  if (y < 2020 || y > 2040) return null;
+  // last day of that month
+  if (mo < 12) return new Date(y, mo, 0); // mo is 1-based; Date(y, mo, 0) = last day of month mo
+  return new Date(y, 11, 31);
+}
+
+function fmtDate(d) {
+  return d.getFullYear() + '/' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function setProgress(pct, text) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = text;
+}
+
+// ━━━━━━━━━━━━━━━━━ Fetch ━━━━━━━━━━━━━━━━━
+async function fetchTWSE(dateStr, depth = 0) {
+  const url = `https://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=${dateStr}&type=0999`;
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if ((data.stat || '').toUpperCase() !== 'OK') {
+      if (depth < 5) {
+        // go back one day
+        const d = new Date(
+          +dateStr.slice(0,4),
+          +dateStr.slice(4,6) - 1,
+          +dateStr.slice(6,8)
+        );
+        d.setDate(d.getDate() - 1);
+        const prev = d.getFullYear()
+          + String(d.getMonth()+1).padStart(2,'0')
+          + String(d.getDate()).padStart(2,'0');
+        setProgress(15, `⚠️ ${dateStr} 非交易日，回溯 ${prev}...`);
+        await new Promise(r => setTimeout(r, 1500));
+        return fetchTWSE(prev, depth + 1);
+      }
+      return null;
+    }
+    for (const t of (data.tables || [])) {
+      if (t && Array.isArray(t.data) && t.data.length > 100) {
+        return { fields: t.fields || [], rows: t.data, title: t.title || '' };
+      }
+    }
+    return null;
+  } catch (e) {
+    if (depth < 3) {
+      // retry with CORS proxy as fallback — but usually not needed for same-region
+      await new Promise(r => setTimeout(r, 2000));
+      return fetchTWSE(dateStr, depth + 1);
+    }
+    throw e;
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━ Main Screening ━━━━━━━━━━━━━━━━━
+async function startScreening() {
+  const maxPrice = parseFloat(document.getElementById('maxPrice').value) || 0.5;
+  const minMonths = parseInt(document.getElementById('minMonths').value) || 6;
+  const wType = document.getElementById('warrantType').value;
+
+  const btn = document.getElementById('btnScreen');
+  btn.disabled = true;
+  document.getElementById('progressWrap').classList.add('active');
+  document.getElementById('metrics').style.display = 'none';
+  document.getElementById('resultSection').style.display = 'none';
+  document.getElementById('msgBox').style.display = 'none';
+  document.getElementById('btnCsv').style.display = 'none';
+
+  try {
+    setProgress(10, '📡 從證交所抓取行情...');
+    const now = new Date();
+    const dateStr = now.getFullYear()
+      + String(now.getMonth()+1).padStart(2,'0')
+      + String(now.getDate()).padStart(2,'0');
+
+    const result = await fetchTWSE(dateStr);
+    if (!result || result.rows.length === 0) {
+      showError('無法取得資料', '請確認您在台灣網路環境下，且證交所 API 可正常連線。');
+      return;
+    }
+
+    setProgress(40, `📊 取得 ${result.rows.length} 筆，解析中...`);
+
+    // Map columns
+    const fi = {};
+    result.fields.forEach((f, i) => {
+      const c = f.trim();
+      if (c.includes('證券代號') || c === '代號') fi['代號'] = i;
+      else if (c.includes('證券名稱') || c === '名稱') fi['名稱'] = i;
+      else if (c.includes('收盤')) fi['收盤價'] = i;
+      else if (c.includes('成交股數')) fi['成交量'] = i;
+      else if (c.includes('開盤')) fi['開盤價'] = i;
+      else if (c.includes('最高')) fi['最高價'] = i;
+      else if (c.includes('最低')) fi['最低價'] = i;
+    });
+
+    const totalRaw = result.rows.length;
+    const cutoff = new Date(now);
+    cutoff.setMonth(cutoff.getMonth() + minMonths);
+
+    setProgress(60, '🔧 解析到期日與篩選...');
+    const filtered = [];
+    for (const row of result.rows) {
+      const name = fi['名稱'] != null ? String(row[fi['名稱']]).trim() : '';
+      const priceVal = fi['收盤價'] != null ? parsePrice(row[fi['收盤價']]) : null;
+      const expiry = extractExpiryFromName(name);
+      if (!priceVal || !expiry) continue;
+      if (priceVal > maxPrice) continue;
+      if (expiry < cutoff) continue;
+
+      // type filter
+      if (wType === 'call' && !name.includes('購')) continue;
+      if (wType === 'put' && !name.includes('售')) continue;
+
+      const daysToExpiry = Math.round((expiry - now) / 86400000);
+      filtered.push({
+        '代號': fi['代號'] != null ? String(row[fi['代號']]).trim() : '',
+        '名稱': name,
+        '收盤價': priceVal,
+        '到期月份': fmtDate(expiry),
+        '距到期': daysToExpiry,
+        '開盤價': fi['開盤價'] != null ? parsePrice(row[fi['開盤價']]) : null,
+        '最高價': fi['最高價'] != null ? parsePrice(row[fi['最高價']]) : null,
+        '最低價': fi['最低價'] != null ? parsePrice(row[fi['最低價']]) : null,
+        '成交量': fi['成交量'] != null ? String(row[fi['成交量']]).trim() : '',
+        _type: name.includes('購') ? 'call' : name.includes('售') ? 'put' : '',
+        _expiry: expiry,
+      });
+    }
+
+    // Sort: longest expiry first, then lowest price
+    filtered.sort((a, b) => b['距到期'] - a['距到期'] || a['收盤價'] - b['收盤價']);
+
+    setProgress(100, '✅ 完成！');
+    await new Promise(r => setTimeout(r, 400));
+
+    if (filtered.length === 0) {
+      showError('無符合條件的結果', '請調整篩選條件後再試。', false);
+      // still show metrics
+      showMetrics(totalRaw, 0, 0, 0);
+      return;
+    }
+
+    allResults = filtered;
+    sortCol = null;
+
+    // Metrics
+    const avgP = (filtered.reduce((s, r) => s + r['收盤價'], 0) / filtered.length);
+    const avgD = (filtered.reduce((s, r) => s + r['距到期'], 0) / filtered.length);
+    showMetrics(totalRaw, filtered.length, avgP, avgD);
+
+    // Table
+    renderTable(filtered);
+    document.getElementById('resultSection').style.display = 'block';
+    document.getElementById('btnCsv').style.display = 'inline-flex';
+    document.getElementById('resultCount').textContent = `共 ${filtered.length} 筆`;
+    document.getElementById('searchInput').value = '';
+
+  } catch (err) {
+    showError('抓取失敗', `${err.message}。請確認在台灣網路環境下使用。`);
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => {
+      document.getElementById('progressWrap').classList.remove('active');
+    }, 600);
+  }
+}
+
+function showMetrics(total, match, avgP, avgD) {
+  document.getElementById('mTotal').textContent = total.toLocaleString();
+  document.getElementById('mMatch').textContent = match.toLocaleString();
+  document.getElementById('mAvgPrice').textContent = avgP ? avgP.toFixed(3) : '-';
+  document.getElementById('mAvgDays').textContent = avgD ? Math.round(avgD) : '-';
+  document.getElementById('metrics').style.display = 'grid';
+}
+
+function showError(title, detail, isError = true) {
+  const box = document.getElementById('msgBox');
+  box.className = 'msg-box' + (isError ? ' error' : '');
+  box.innerHTML = `
+    <div class="icon">${isError ? '❌' : '⚠️'}</div>
+    <div class="title">${title}</div>
+    <div>${detail}</div>`;
+  box.style.display = 'block';
+  document.getElementById('resultSection').style.display = 'none';
+  document.getElementById('btnCsv').style.display = 'none';
+}
+
+// ━━━━━━━━━━━━━━━━━ Table Rendering ━━━━━━━━━━━━━━━━━
+const COLUMNS = ['代號','名稱','收盤價','到期月份','距到期','開盤價','最高價','最低價','成交量'];
+const COL_LABELS = { '距到期': '距到期(天)' };
+
+function renderTable(data) {
+  // thead
+  const thead = document.getElementById('thead');
+  thead.innerHTML = '<tr>' + COLUMNS.map(c => {
+    const label = COL_LABELS[c] || c;
+    const icon = sortCol === c ? (sortAsc ? ' ▲' : ' ▼') : '';
+    return `<th onclick="sortTable('${c}')">${label}<span class="sort-icon">${icon}</span></th>`;
+  }).join('') + '</tr>';
+
+  // tbody
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = data.map(row => {
+    const typeTag = row._type === 'call'
+      ? '<span class="tag-call">購</span>'
+      : row._type === 'put'
+        ? '<span class="tag-put">售</span>'
+        : '';
+    return '<tr>' + COLUMNS.map(c => {
+      let v = row[c];
+      if (c === '名稱') return `<td>${v} ${typeTag}</td>`;
+      if (c === '收盤價' || c === '開盤價' || c === '最高價' || c === '最低價')
+        return `<td>${v != null ? v.toFixed(2) : '-'}</td>`;
+      if (c === '距到期') return `<td>${v}天</td>`;
+      return `<td>${v ?? '-'}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+}
+
+function sortTable(col) {
+  if (sortCol === col) { sortAsc = !sortAsc; }
+  else { sortCol = col; sortAsc = true; }
+  const data = getFilteredData();
+  data.sort((a, b) => {
+    let va = a[col], vb = b[col];
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return sortAsc ? va - vb : vb - va;
+  });
+  renderTable(data);
+}
+
+function getFilteredData() {
+  const kw = document.getElementById('searchInput').value.trim();
+  if (!kw) return [...allResults];
+  return allResults.filter(r => r['名稱'].includes(kw) || r['代號'].includes(kw));
+}
+
+function filterTable() {
+  const data = getFilteredData();
+  renderTable(data);
+  document.getElementById('resultCount').textContent = `共 ${data.length} 筆`;
+}
+
+// ━━━━━━━━━━━━━━━━━ CSV Download ━━━━━━━━━━━━━━━━━
+function downloadCSV() {
+  const data = getFilteredData();
+  if (!data.length) return;
+  const header = COLUMNS.join(',');
+  const rows = data.map(r =>
+    COLUMNS.map(c => {
+      let v = r[c];
+      if (v == null) return '';
+      if (typeof v === 'string' && v.includes(',')) return `"${v}"`;
+      return v;
+    }).join(',')
+  );
+  const bom = '\uFEFF';
+  const csv = bom + header + '\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0,16).replace(/[-:T]/g, '');
+  a.href = url;
+  a.download = `warrant_${ts}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+
+</body>
+</html>
